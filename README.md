@@ -394,6 +394,6 @@ Three screen-recorded tutorials accompany the protein–ligand guide: *adding hy
 
 ## 👤 Author
 
-**Phan Hoang Nam** · M.S. student, Smart Medicine and Health Informatics, National Taiwan University
+**Phan Hoang Nam (潘黃南)** · M.S. student, Smart Medicine and Health Informatics, National Taiwan University
 
 If these protocols help your work, please cite the original methods above and link back to this repository.
