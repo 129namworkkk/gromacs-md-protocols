@@ -194,6 +194,6 @@ gmx_MMPBSA -h
 |---------|---------|------|
 | UCSF Chimera | thêm hydrogen cho ligand, tách/chuyển định dạng PDB | https://www.cgl.ucsf.edu/chimera/download.html |
 | LigParGen | sinh topology OPLS-AA cho ligand | https://zarbi.chem.yale.edu/ligpargen/ |
-| PDBFixer (OpenMM) | bổ sung atom/residue bị thiếu | `conda install -c conda-forge pdbfixer openmm -y` |
+| PDBFixer (OpenMM) | tự sửa missing residues / atoms (`scripts/fix_structure.py`, `prepare_system.sh`) | `conda install -c conda-forge pdbfixer openmm -y` hoặc `pip install openmm pdbfixer` |
 | PyMOL / VMD | xem cấu trúc, trajectory | — |
 | xmgrace | xem nhanh file `.xvg` | `sudo apt-get install grace` |

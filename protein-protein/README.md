@@ -47,6 +47,12 @@ cd /mnt/<đường-dẫn-working-space>
 source ~/gromacs-2023.3-cuda/bin/GMXRC     # nếu dùng bản build CUDA
 ```
 
+> **Tự động hoá bước chuẩn bị + sửa lỗi cấu trúc:** [`scripts/prepare_system.sh`](../scripts/prepare_system.sh) tự model missing residues, dựng lại atom thiếu, chạy `pdb2gmx`, thêm nước + ion và tạo index:
+> ```bash
+> bash scripts/prepare_system.sh --system pp --pdb input.pdb --workdir runs/my_run
+> ```
+> Chọn force field khác: [docs/FORCE_FIELDS.md](../docs/FORCE_FIELDS.md).
+
 ---
 
 ## 1. Chuẩn bị complex

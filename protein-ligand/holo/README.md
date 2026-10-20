@@ -49,6 +49,13 @@ Chung: `tc-grps = Protein_UNL Water_and_ions`, LINCS (h-bonds), PME, `rvdw = rco
 cd /mnt/<đường-dẫn-working-space>
 ```
 
+
+> **Tự động hoá bước chuẩn bị + sửa lỗi cấu trúc:** [`scripts/prepare_system.sh`](../../scripts/prepare_system.sh) tự model missing residues, dựng lại atom thiếu, chạy `pdb2gmx`, ghép ligand LigParGen vào `complex.gro` / `topol.top` (bước 4–5, 10–11), thêm nước + ion và tạo index:
+> ```bash
+> bash scripts/prepare_system.sh --system holo --pdb input.pdb --workdir runs/my_run --lig-gro lig.gro --lig-itp lig.itp
+> ```
+> Chọn force field khác: [docs/FORCE_FIELDS.md](../../docs/FORCE_FIELDS.md).
+
 ## 1. Chuẩn bị dữ liệu
 
 Chuẩn bị file `complex.pdb`, sau đó tách protein và ligand:

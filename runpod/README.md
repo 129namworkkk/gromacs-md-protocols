@@ -48,6 +48,13 @@ Làm theo guide của hệ bạn **đến hết bước thêm ion và tạo inde
 
 Nếu `topol.top` `#include` một thư mục force field nằm trong thư mục làm việc (ví dụ `./oplsaa.ff/`), copy cả thư mục đó.
 
+Cách nhanh hơn: [`scripts/prepare_system.sh`](../scripts/prepare_system.sh) làm toàn bộ bước này không cần tương tác (kể cả **tự sửa missing residues / atoms** và ghép ligand LigParGen). Có thể chạy ngay trên pod sau khi `pip install openmm pdbfixer`:
+
+```bash
+bash /workspace/gromacs-md-protocols/scripts/prepare_system.sh --system holo --pdb complex.pdb \
+     --lig-gro lig.gro --lig-itp lig.itp --workdir /workspace/runs/my_complex
+```
+
 Nén lại (trong Ubuntu/WSL):
 
 ```bash

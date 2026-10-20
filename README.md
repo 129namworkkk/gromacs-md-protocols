@@ -69,6 +69,8 @@ gromacs-md-protocols/
 │       └── apo_quick_plots.ipynb    # quick RMSD / RMSF / Rg / SASA plots
 │
 ├── scripts/
+│   ├── prepare_system.sh            # PDB → solv_ions.gro + topol.top + index.ndx, with auto-repair
+│   ├── fix_structure.py             # missing residues / atoms, non-standard residues (PDBFixer)
 │   └── plot_compare_metrics.py      # APO vs HOLO comparison figures (PNG + TIFF)
 │
 ├── runpod/                          # OPTIONAL: run the long simulations on rented GPUs
@@ -82,6 +84,7 @@ gromacs-md-protocols/
 │
 └── docs/
     ├── INSTALL.md                   # Ubuntu/WSL, GROMACS 2023.3 CUDA build, conda envs
+    ├── FORCE_FIELDS.md              # choosing a force field, water model and ligand parameters
     ├── EXTENDED_500NS.md            # OPTIONAL 500 ns production: files, extension, analysis tips
     ├── TROUBLESHOOTING.md           # common pdb2gmx / grompp / trjconv / MM-GBSA errors
     └── MD_results_interpretation.md # how to read RMSD, RMSF, SASA, H-bonds, ΔG_bind
@@ -203,6 +206,8 @@ flowchart LR
 On RunPod (or any Linux GPU machine) the whole simulation is one resumable command:
 
 ```bash
+bash scripts/prepare_system.sh --system holo --pdb complex.pdb --lig-gro lig.gro --lig-itp lig.itp \
+     --workdir /workspace/runs/my_complex                                                          # repair + topology + water + ions
 bash runpod/run_md.sh --system holo --length 500 --workdir /workspace/runs/my_complex --quick-test   # 500-step smoke test
 bash runpod/benchmark.sh --workdir /workspace/runs/my_complex --price 0.69                          # ns/day + cost (after --grompp-only)
 bash runpod/run_md.sh --system holo --length 500 --workdir /workspace/runs/my_complex                # real run; re-run to resume
@@ -210,6 +215,27 @@ bash runpod/pack_results.sh --workdir /workspace/runs/my_complex                
 ```
 
 `--system` is `pp`, `apo` or `holo`; finished stages are skipped and production resumes from the last checkpoint (written every 15 min), so interruptible (spot) pods are safe to use.
+
+### 🩹 Automatic structure repair
+
+Crystal structures and docking outputs often have **missing residues** (unresolved loops), **truncated side chains**, non-standard residues (MSE, …) or leftover waters and ions — the source of errors such as *"atom CG used in that entry is not found in the input file"* or of energy minimisation blowing up across a chain gap.
+
+[`scripts/prepare_system.sh`](scripts/prepare_system.sh) repairs the structure with [`fix_structure.py`](scripts/fix_structure.py) (PDBFixer) **before** `pdb2gmx`, retries `pdb2gmx` automatically if it still reports missing atoms, and then builds the box, water, ions and index groups — for holo it also merges the LigParGen ligand into `complex.gro` / `topol.top`:
+
+| Problem in the input | What happens |
+|----------------------|--------------|
+| Internal gap ≤ 15 residues (needs SEQRES, or `--fasta`) | residues modelled |
+| Longer gap / no sequence available | chain split with `TER` so no bond is drawn across the gap (warning) |
+| Missing side-chain atoms, missing OXT | rebuilt |
+| Non-standard residues (MSE → MET, …) | replaced |
+| Waters, ions, buffer molecules | removed (keep with `--keep-het`) |
+
+```bash
+python scripts/fix_structure.py model.pdb --check-only          # report gaps only, no dependencies
+bash scripts/prepare_system.sh --system apo --pdb docked.pdb --fasta target.fasta --workdir runs/apo
+```
+
+Choosing `--ff` / `--water` and matching ligand parameters: [docs/FORCE_FIELDS.md](docs/FORCE_FIELDS.md).
 
 ---
 
@@ -328,6 +354,8 @@ MD does not prove that a compound works; it builds quantitative evidence that a 
 | [`protein-ligand/apo/README.md`](protein-ligand/apo/README.md) | protein-only control and APO checklist |
 | [`protein-ligand/ANALYSIS.md`](protein-ligand/ANALYSIS.md) | PBC correction, index groups, all APO/HOLO metrics |
 | [`protein-ligand/MMGBSA.md`](protein-ligand/MMGBSA.md) | gmx_MMPBSA preparation, serial and MPI runs, reading ΔTOTAL |
+| [`docs/FORCE_FIELDS.md`](docs/FORCE_FIELDS.md) | which force field for which system (folded, IDP, protein–ligand, membrane, nucleic acids, glycans, metals), water models, ligand parameterisation, `.mdp` nonbonded settings per force field |
+| [`scripts/prepare_system.sh`](scripts/prepare_system.sh) | automated preparation with structure repair (missing residues/atoms), ligand merge, solvation, ions, index |
 | [`docs/EXTENDED_500NS.md`](docs/EXTENDED_500NS.md) | optional 500 ns production: parameter differences, extending a 100 ns run, time and disk estimates, analysis tips |
 | [`runpod/README.md`](runpod/README.md) | optional cloud GPU workflow: pod setup, GROMACS build, quick test, benchmark, resumable run, packing and downloading results, replicas |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | missing atoms (PDBFixer), thermostat group errors, atom mismatches, ChamberParm error |
@@ -350,7 +378,7 @@ Three screen-recorded tutorials accompany the protein–ligand guide: *adding hy
 | [UCSF Chimera](https://www.cgl.ucsf.edu/chimera/) | — | protonating ligands, PDB editing |
 | [LigParGen](https://zarbi.chem.yale.edu/ligpargen/) | web server | OPLS-AA ligand parameters |
 | [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/) + AmberTools ≤ 23.3 | Python 3.11 | MM/GBSA |
-| [PDBFixer](https://github.com/openmm/pdbfixer) | — | rebuilding missing atoms |
+| [PDBFixer](https://github.com/openmm/pdbfixer) + OpenMM | `pip install openmm pdbfixer` | automatic repair of missing residues / atoms |
 | Python | 3 with `numpy`, `matplotlib` | plotting |
 | [RunPod](https://www.runpod.io/) *(optional)* | GPU pod + network volume | long (500 ns) runs without a local GPU |
 
