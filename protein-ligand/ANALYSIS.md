@@ -1,8 +1,8 @@
 # Post-MD Analysis — APO vs HOLO
 
-Pipeline thống nhất để xử lý trajectory APO và HOLO **theo cùng một cách**, sau đó so sánh trực tiếp bằng [`scripts/plot_compare_metrics.py`](../scripts/plot_compare_metrics.py).
+A unified pipeline that processes the APO and HOLO trajectories **in exactly the same way**, then compares them directly with [`scripts/plot_compare_metrics.py`](../scripts/plot_compare_metrics.py).
 
-> Quy ước tên file: đổi tên output MD thành `apo.tpr` / `apo.xtc` và `holo.tpr` / `holo.xtc` trước khi chạy các lệnh dưới đây.
+> Naming convention: rename the MD outputs to `apo.tpr` / `apo.xtc` and `holo.tpr` / `holo.xtc` before running the commands below. (The water-free `md_noWater.tpr` / `md_noWater.xtc` written by [`runpod/pack_results.sh`](../runpod/pack_results.sh) work the same way.)
 
 ```mermaid
 flowchart LR
@@ -22,30 +22,30 @@ flowchart LR
 
 ---
 
-## A. APO pipeline (Protein)
+## A. APO pipeline (protein)
 
 ```bash
-# kiểm tra số atom trong xtc
+# check the number of atoms in the xtc
 gmx check -f apo.xtc
 
-# PBC: nojump (giữ liên tục theo thời gian)         Output: System
+# PBC: nojump (keeps molecules continuous in time)          Output: System
 gmx trjconv -s apo.tpr -f apo.xtc -o apo_nojump.xtc -pbc nojump
 
-# PBC: mol + center + compact (trajectory "whole/compact")
+# PBC: mol + center + compact ("whole / compact" trajectory)
 gmx trjconv -s apo.tpr -f apo_nojump.xtc -o apo_nopbc.xtc -pbc mol -center -ur compact
 # Center: Protein   Output: System
 
-# Fit để dùng cho RMSF
+# Fitted trajectory for RMSF
 gmx trjconv -s apo.tpr -f apo_nopbc.xtc -o apo_fit.xtc -fit rot+trans
 # Fit group: Backbone   Output: Protein
 ```
 
-> Nếu gặp lỗi mismatch atom, 99% là do chọn Output **System** trong khi `.xtc` chỉ chứa **Protein**.
+> An atom-count mismatch error almost always means **System** was chosen as output while the `.xtc` contains only **Protein**.
 
-## B. HOLO pipeline (Protein + Ligand)
+## B. HOLO pipeline (protein + ligand)
 
 ```bash
-# PBC: nojump                                         Output: System
+# PBC: nojump                                                Output: System
 gmx trjconv -s holo.tpr -f holo.xtc -o holo_nojump.xtc -pbc nojump
 
 # PBC: mol + center + compact
@@ -53,22 +53,22 @@ gmx trjconv -s holo.tpr -f holo_nojump.xtc -o holo_nopbc.xtc -pbc mol -center -u
 # Center: Protein   Output: System
 ```
 
-Tạo index cho HOLO: `LIG` + `COMPLEX` (Protein | LIG):
+Create the HOLO index: `LIG` + `COMPLEX` (Protein | LIG):
 
 ```bash
 gmx make_ndx -f holo.tpr -o index_holo.ndx
 ```
 
 ```text
-> l                          # liệt kê residue names để chắc resname ligand
-> r <LIG_RESNAME>            # ví dụ: r 5315649 hoặc r UNL
-> name <id_moi> LIG
+> l                          # list residue names to confirm the ligand name
+> r <LIG_RESNAME>            # e.g. r 5315649 or r UNL
+> name <new_id> LIG
 > <id_Protein> | <id_LIG>
-> name <id_moi> COMPLEX
+> name <new_id> COMPLEX
 > q
 ```
 
-Fit HOLO theo protein (để RMSF "đúng"):
+Fit HOLO on the protein (needed for a meaningful RMSF):
 
 ```bash
 gmx trjconv -s holo.tpr -f holo_nopbc.xtc -o holo_fit.xtc -fit rot+trans -n index_holo.ndx
@@ -77,40 +77,40 @@ gmx trjconv -s holo.tpr -f holo_nopbc.xtc -o holo_fit.xtc -fit rot+trans -n inde
 
 ---
 
-## C. Phân tích (dùng file đã nopbc/fit để đồng nhất)
+## C. Analysis (always on the nopbc / fit trajectories, for consistency)
 
-### Bảng tổng hợp
+### Summary table
 
-| # | Chỉ số | Hệ | Lệnh | Chọn nhóm | Output |
-|---|--------|----|------|-----------|--------|
-| C1.1 | RMSD protein | APO | `gmx rms -s apo.tpr -f apo_nopbc.xtc -o rmsd_apo.xvg -tu ns` | Backbone / Backbone | `rmsd_apo.xvg` |
-| C1.2 | RMSD protein | HOLO | `gmx rms -s holo.tpr -f holo_nopbc.xtc -o rmsd_holo.xvg -tu ns -n index_holo.ndx` | Backbone / Backbone | `rmsd_holo.xvg` |
-| C1.3 | RMSD ligand (fit theo protein) | HOLO | `gmx rms -s holo.tpr -f holo_nopbc.xtc -o rmsd_lig.xvg -tu ns -n index_holo.ndx` | Backbone / LIG | `rmsd_lig.xvg` |
-| C2.1 | RMSF Cα | APO | `gmx rmsf -s apo.tpr -f apo_fit.xtc -o rmsf_apo_at.xvg` | C-alpha | `rmsf_apo_at.xvg` |
-| C2.2 | RMSF Cα | HOLO | `gmx rmsf -s holo.tpr -f holo_fit.xtc -o rmsf_holo_at.xvg -n index_holo.ndx` | C-alpha | `rmsf_holo_at.xvg` |
-| C3.1 | SASA protein | APO | `gmx sasa -s apo.tpr -f apo_nopbc.xtc -o sasa_protein_apo.xvg -tu ns` | Protein / Protein | `sasa_protein_apo.xvg` |
-| C3.2 | SASA protein | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_protein_holo.xvg -tu ns` | Protein / Protein | `sasa_protein_holo.xvg` |
-| C3.3 | SASA ligand | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_lig_holo.xvg -tu ns` | LIG / LIG | `sasa_lig_holo.xvg` |
-| C3.4 | SASA complex | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_complex_holo.xvg -tu ns` | COMPLEX / COMPLEX | `sasa_complex_holo.xvg` |
-| C3.5 | BSA / ΔSASA | HOLO | *script awk bên dưới* | — | `bsa_holo_timeseries.xvg` |
+| # | Metric | System | Command | Groups | Output |
+|---|--------|--------|---------|--------|--------|
+| C1.1 | Protein RMSD | APO | `gmx rms -s apo.tpr -f apo_nopbc.xtc -o rmsd_apo.xvg -tu ns` | Backbone / Backbone | `rmsd_apo.xvg` |
+| C1.2 | Protein RMSD | HOLO | `gmx rms -s holo.tpr -f holo_nopbc.xtc -o rmsd_holo.xvg -tu ns -n index_holo.ndx` | Backbone / Backbone | `rmsd_holo.xvg` |
+| C1.3 | Ligand RMSD (fit on protein) | HOLO | `gmx rms -s holo.tpr -f holo_nopbc.xtc -o rmsd_lig.xvg -tu ns -n index_holo.ndx` | Backbone / LIG | `rmsd_lig.xvg` |
+| C2.1 | Cα RMSF | APO | `gmx rmsf -s apo.tpr -f apo_fit.xtc -o rmsf_apo_at.xvg` | C-alpha | `rmsf_apo_at.xvg` |
+| C2.2 | Cα RMSF | HOLO | `gmx rmsf -s holo.tpr -f holo_fit.xtc -o rmsf_holo_at.xvg -n index_holo.ndx` | C-alpha | `rmsf_holo_at.xvg` |
+| C3.1 | Protein SASA | APO | `gmx sasa -s apo.tpr -f apo_nopbc.xtc -o sasa_protein_apo.xvg -tu ns` | Protein / Protein | `sasa_protein_apo.xvg` |
+| C3.2 | Protein SASA | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_protein_holo.xvg -tu ns` | Protein / Protein | `sasa_protein_holo.xvg` |
+| C3.3 | Ligand SASA | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_lig_holo.xvg -tu ns` | LIG / LIG | `sasa_lig_holo.xvg` |
+| C3.4 | Complex SASA | HOLO | `gmx sasa -s holo.tpr -f holo_nopbc.xtc -n index_holo.ndx -o sasa_complex_holo.xvg -tu ns` | COMPLEX / COMPLEX | `sasa_complex_holo.xvg` |
+| C3.5 | BSA / ΔSASA | HOLO | *awk script below* | — | `bsa_holo_timeseries.xvg` |
 | C4.1 | Rg | APO | `gmx gyrate -s apo.tpr -f apo_nopbc.xtc -o rg_apo.xvg -tu ns` | Protein | `rg_apo.xvg` |
 | C4.2 | Rg | HOLO | `gmx gyrate -s holo.tpr -f holo_nopbc.xtc -o rg_holo.xvg -tu ns -n index_holo.ndx` | Protein | `rg_holo.xvg` |
-| C5.1 | H-bond nội protein | APO | `gmx hbond -s apo.tpr -f apo_nopbc.xtc -num hb_apo.xvg -tu ns` | Protein / Protein | `hb_apo.xvg` |
-| C5.2 | H-bond protein–ligand | HOLO | `gmx hbond -s holo.tpr -f holo_nopbc.xtc -num hb_prot_lig.xvg -tu ns -n index_holo.ndx` | Protein / LIG | `hb_prot_lig.xvg` |
+| C5.1 | Intra-protein H-bonds | APO | `gmx hbond -s apo.tpr -f apo_nopbc.xtc -num hb_apo.xvg -tu ns` | Protein / Protein | `hb_apo.xvg` |
+| C5.2 | Protein–ligand H-bonds | HOLO | `gmx hbond -s holo.tpr -f holo_nopbc.xtc -num hb_prot_lig.xvg -tu ns -n index_holo.ndx` | Protein / LIG | `hb_prot_lig.xvg` |
 
-> Với GROMACS 2024+, cú pháp chọn nhóm của `gmx hbond` dùng selection (`-r` / `-t`); cú pháp kiểu cũ ở trên chạy bằng `gmx hbond-legacy`.
+> In GROMACS 2024+, `gmx hbond` selects groups with selections (`-r` / `-t`); the group-prompt syntax above runs with `gmx hbond-legacy`.
 
-### C3.5 Buried Surface Area theo thời gian
+### C3.5 Buried surface area over time
 
 $$\mathrm{BSA}(t) = \mathrm{SASA}_{protein}(t) + \mathrm{SASA}_{ligand}(t) - \mathrm{SASA}_{complex}(t)$$
 
 ```bash
-# lấy đúng 2 cột: time và SASA_total
+# keep exactly two columns: time and total SASA
 grep -v '^[#@]' sasa_protein_holo.xvg | awk '{print $1,$2}' > prot.dat
 grep -v '^[#@]' sasa_lig_holo.xvg     | awk '{print $1,$2}' > lig.dat
 grep -v '^[#@]' sasa_complex_holo.xvg | awk '{print $1,$2}' > cplx.dat
 
-# BSA(t) = Prot(t) + Lig(t) - Complex(t), kèm kiểm tra time khớp nhau
+# BSA(t) = Prot(t) + Lig(t) - Complex(t), with a check that the time columns match
 paste prot.dat lig.dat cplx.dat | awk '
 BEGIN{OFS="\t"}
 ($1!=$3 || $1!=$5){print "Time mismatch at line", NR, ":", $1,$3,$5 > "/dev/stderr"; exit 1}
@@ -120,23 +120,23 @@ BEGIN{OFS="\t"}
 
 ---
 
-## D. Vẽ hình so sánh
+## D. Comparison figures
 
-Đặt toàn bộ file `.xvg` ở trên vào một thư mục rồi chạy:
+Put all the `.xvg` files above in one folder and run:
 
 ```bash
 python scripts/plot_compare_metrics.py --base path/to/xvg --outdir plots --dpi 600
 ```
 
-| Hình | Dữ liệu |
-|------|---------|
+| Figure | Data |
+|--------|------|
 | `RMSD_APO_vs_HOLO_plus_Ligand` | `rmsd_apo` · `rmsd_holo` · `rmsd_lig` |
 | `RMSF_APO_vs_HOLO` | `rmsf_apo_at` · `rmsf_holo_at` |
-| `Rg_APO_vs_HOLO` (hoặc `Rg_HOLO_only`) | `rg_apo` · `rg_holo` |
+| `Rg_APO_vs_HOLO` (or `Rg_HOLO_only`) | `rg_apo` · `rg_holo` |
 | `SASA_APO_vs_HOLO` | `sasa_protein_apo` · `sasa_protein_holo` · `sasa_lig_holo` · `sasa_complex_holo` |
 | `BSA_HOLO` | `bsa_holo_timeseries` |
 | `HBonds_HOLO_prot_lig` | `hb_prot_lig` |
 
-Mỗi hình được lưu đồng thời `.png` và `.tiff` (sẵn sàng cho bài báo). File thiếu sẽ được bỏ qua kèm cảnh báo `[WARN]`.
+Each figure is saved as both `.png` and `.tiff` (publication-ready). Missing input files are skipped with a `[WARN]` message.
 
-Đọc và diễn giải kết quả: [docs/MD_results_interpretation.md](../docs/MD_results_interpretation.md).
+Reading and interpreting the results: [docs/MD_results_interpretation.md](../docs/MD_results_interpretation.md).

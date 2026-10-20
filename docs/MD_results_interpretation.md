@@ -1,128 +1,126 @@
-# Đọc và diễn giải kết quả MD (Protein–Ligand)
+# Reading and interpreting MD results (protein–ligand)
 
-> Tài liệu hướng dẫn đọc kết quả MD (tiếng Việt).
-
-**MD không "chứng minh thuốc hiệu quả"**, nhưng tạo bộ bằng chứng định lượng rằng ligand bám ổn + tương tác hợp lý + có cơ sở ưu tiên thử nghiệm.
+**MD does not "prove that a drug works"**, but it provides quantitative evidence that the ligand binds stably, interacts plausibly, and deserves priority for experimental testing.
 
 ---
 
-## 1. Bức tranh tổng thể: MD đang trả lời câu hỏi gì?
+## 1. The big picture: which questions does MD answer?
 
-Sau docking, MD thường trả lời 3 câu hỏi lớn:
+After docking, MD usually addresses three main questions:
 
-| # | Câu hỏi | Chỉ số |
-|---|---------|--------|
-| 1 | Complex có bền hình học không? | RMSD, ligand RMSD, RMSF, Rg, SASA, COM distance, clustering… |
-| 2 | Tương tác ligand–pocket có ổn định không? | H-bond (và occupancy), contacts, mindist, water bridges, key residues… |
-| 3 | Binding có "thuận lợi về năng lượng" không? | MM/GBSA (ΔG_bind), decomposition theo residue (ai đóng góp), so sánh với ligand khác/pose khác |
+| # | Question | Metrics |
+|---|----------|---------|
+| 1 | Is the complex geometrically stable? | RMSD, ligand RMSD, RMSF, Rg, SASA, COM distance, clustering… |
+| 2 | Are the ligand–pocket interactions stable? | H-bonds (and occupancy), contacts, mindist, water bridges, key residues… |
+| 3 | Is binding energetically favourable? | MM/GBSA (ΔG_bind), per-residue decomposition (which residues contribute), comparison with other ligands / poses |
 
-Muốn "toàn vẹn" cho quy trình MD → bạn nên có đủ 3 nhóm bằng chứng.
+A complete MD study should provide all three kinds of evidence.
 
 ---
 
-## 2. Giải thích và cách đọc từng chỉ số MD
+## 2. What each metric means and how to read it
 
 ### A) RMSD (protein & ligand)
 
 **Protein RMSD (APO vs HOLO)**
-- *Ý nghĩa:* cấu trúc tổng thể của protein có ổn định không.
-- *Đọc nhanh:*
-  - RMSD ổn định sau giai đoạn đầu → hệ đạt cân bằng tương đối.
-  - HOLO RMSD thấp/ổn định hơn APO đôi khi gợi ý ligand "stabilize" cấu trúc.
-  - ⚠️ *Red flags:* spike cực lớn mà SASA không đổi → thường là PBC artifact.
+- *Meaning:* is the overall protein structure stable?
+- *Quick reading:*
+  - RMSD levels off after the initial phase → the system has reached relative equilibrium.
+  - A lower / more stable HOLO RMSD than APO sometimes suggests that the ligand "stabilises" the structure.
+  - ⚠️ *Red flag:* a very large spike while SASA does not change → usually a PBC artefact.
 
-**Ligand RMSD (fit theo protein)**
-- *Ý nghĩa:* ligand có giữ tư thế trong pocket không.
-- *Đọc nhanh:*
-  - Ligand RMSD thấp và không drift mạnh → ligand không "trôi khỏi pocket".
-  - Nếu ligand RMSD tăng dần rồi plateau cao: ligand đổi pose nhưng vẫn bám; cần clustering để xem đổi sang pose ổn định mới.
+**Ligand RMSD (fitted on the protein)**
+- *Meaning:* does the ligand keep its pose in the pocket?
+- *Quick reading:*
+  - Low ligand RMSD without strong drift → the ligand does not "drift out of the pocket".
+  - Ligand RMSD rising and then plateauing at a high value: the ligand changed pose but stays bound; use clustering to see whether it moved to a new stable pose.
 
 ### B) RMSF (Cα) (APO vs HOLO)
-- *Ý nghĩa:* residue nào linh động; ligand làm pocket "cứng" hay "mềm" hơn.
-- *Đọc nhanh:*
-  - Pocket residues giảm RMSF ở HOLO → ligand có xu hướng "khóa" vùng pocket.
-  - Nếu một loop quan trọng tăng RMSF mạnh ở HOLO → có thể ligand gây bất ổn cục bộ.
+- *Meaning:* which residues are flexible; does the ligand make the pocket more rigid or more flexible?
+- *Quick reading:*
+  - Lower RMSF of pocket residues in HOLO → the ligand tends to "lock" the pocket.
+  - A key loop with much higher RMSF in HOLO → the ligand may cause local instability.
 
-### C) SASA (Protein / Ligand / Complex)
-- **Protein SASA (APO vs HOLO):** protein có mở/đóng không.
-- **Ligand SASA (trong HOLO):** ligand có "buried" ổn định không.
-- **Complex SASA:** bổ trợ cho "độ compact" của toàn complex.
+### C) SASA (protein / ligand / complex)
+- **Protein SASA (APO vs HOLO):** does the protein open or close?
+- **Ligand SASA (in HOLO):** does the ligand stay buried?
+- **Complex SASA:** complements the picture of how compact the whole complex is.
 
-*Cách diễn giải hợp lý:*
-- Ligand SASA thấp và ổn định → ligand ít lộ dung môi → hay được hiểu là nằm sâu/ổn định trong pocket (tốt).
-- Protein SASA không nhảy bất thường → không có unfolding đáng kể.
+*Reasonable interpretation:*
+- Low and stable ligand SASA → the ligand is little exposed to solvent → usually read as sitting deep / stably in the pocket (good).
+- Protein SASA without abnormal jumps → no significant unfolding.
 
-### D) Rg (Protein)
-- *Ý nghĩa:* độ "gọn" toàn protein.
-- *Đọc nhanh:*
-  - Rg ổn định → không có giãn/mở bất thường.
-  - HOLO Rg hơi thấp hơn APO đôi khi gợi ý complex "compact" hơn.
+### D) Rg (protein)
+- *Meaning:* overall compactness of the protein.
+- *Quick reading:*
+  - Stable Rg → no abnormal expansion or opening.
+  - A slightly lower HOLO Rg than APO sometimes suggests a more compact complex.
 
-### E) H-bond (Protein–Ligand)
-- *Ý nghĩa:* liên kết H-bond có duy trì không.
-- *Đọc nhanh:*
-  - H-bond count không cần quá nhiều; quan trọng là ổn định và đúng residue chủ chốt.
-  - Nên bổ sung: H-bond occupancy theo từng residue (xem mục 3.4).
+### E) H-bonds (protein–ligand)
+- *Meaning:* are hydrogen bonds maintained?
+- *Quick reading:*
+  - The number of H-bonds does not need to be large; what matters is stability and involvement of key residues.
+  - Add per-residue H-bond occupancy (see section 3.4).
 
-### F) DSSP (Secondary structure)
-- *Ý nghĩa:* protein có giữ alpha/beta ổn định không (apo vs holo).
-- *Đọc nhanh:*
-  - Nếu holo làm SS ổn định hơn (ít chuyển coil↔helix) → hỗ trợ "stabilization".
-  - Nếu pocket hoặc vùng chức năng bị biến đổi SS mạnh → cần cẩn trọng.
+### F) DSSP (secondary structure)
+- *Meaning:* does the protein keep its α/β structure (APO vs HOLO)?
+- *Quick reading:*
+  - If HOLO keeps the secondary structure more stable (fewer coil↔helix transitions) → supports "stabilisation".
+  - Strong secondary-structure changes in the pocket or a functional region → interpret with care.
 
 ### G) MM/GBSA
-- *Ý nghĩa:* ước lượng năng lượng liên kết ΔG_bind theo thời gian/mean±SD, và phân rã thành phần.
-- *Đọc nhanh:* ΔTOTAL âm ổn định → binding thuận lợi theo mô hình.
-- *Thành phần nói "ligand bám kiểu gì":*
+- *Meaning:* estimated binding free energy ΔG_bind over time / as mean ± SD, with its decomposition into terms.
+- *Quick reading:* a stable negative ΔTOTAL → favourable binding according to the model.
+- *The terms tell you how the ligand binds:*
 
-| Thành phần | Dấu thường gặp | Ý nghĩa |
-|-----------|----------------|---------|
-| ΔVDWAALS | âm lớn | đóng gói kỵ nước / shape complementarity là driver chính |
-| ΔEGB | dương | polar solvation penalty (thường gặp) |
-| ΔESURF | âm | nonpolar solvation thuận lợi (burial) |
-| ΔEEL | nhỏ | electrostatic trực tiếp không phải driver chính |
+| Term | Typical sign | Meaning |
+|------|--------------|---------|
+| ΔVDWAALS | large negative | hydrophobic packing / shape complementarity is the main driver |
+| ΔEGB | positive | polar solvation penalty (common) |
+| ΔESURF | negative | favourable non-polar solvation (burial) |
+| ΔEEL | small | direct electrostatics is not the main driver |
 
-Với kết quả ΔTOTAL âm rõ + driver vdW, cách diễn giải "đúng bài" là: binding được dẫn dắt bởi packing kỵ nước và phù hợp hình dạng, dung môi phân cực triệt một phần nhưng tổng vẫn thuận lợi.
-
----
-
-## 3. Những phân tích "rất nên thêm" để củng cố luận điểm complex tốt
-
-Khi đã có phần "core", để bài chắc hơn và gần phong cách paper, thường bổ sung các mảnh sau:
-
-1. **Contacts & min distance (interface stability)**: `ncontacts(t)` giữa Protein–Ligand (trong cutoff, ví dụ 0.35–0.45 nm); `mindist(t)` protein–ligand.
-   *Vì sao mạnh:* nó trực tiếp chứng minh "ligand vẫn giữ tiếp xúc" chứ không chỉ RMSD.
-2. **COM distance (ligand có trôi khỏi pocket không)**: khoảng cách COM(ligand)–COM(pocket) hoặc COM(protein).
-   *Vì sao mạnh:* ligand RMSD đôi khi tăng vì xoay/đổi pose; COM distance mới nói rõ "có rời pocket không".
-3. **Clustering (tư thế binding chủ đạo)**: chạy clustering cho đoạn ổn định (vd 20–100 ns). Report: top 1–3 cluster + % occupancy + representative pose.
-   *Vì sao mạnh:* paper rất thích "dominant binding mode".
-4. **H-bond occupancy theo residue**: không chỉ "bao nhiêu H-bond", mà là H-bond nào giữ lâu nhất (%) và residue nào là key.
-   *Vì sao mạnh:* giúp kể câu chuyện cơ chế tương tác, chọn residue để đột biến/assay.
-5. **Per-residue energy decomposition (MM/GBSA decomp)**: bảng residue đóng góp năng lượng (top favorable residues).
-   *Vì sao mạnh:* kết nối năng lượng ↔ pocket residues ↔ rational drug design.
-6. **PCA / Essential dynamics (apo vs holo)**: so sánh không gian chuyển động chính; holo có "giảm dao động" ở pocket không.
-   *Vì sao mạnh:* cho thấy ligand ảnh hưởng động lực học toàn cục.
-7. **Replicate MD (cực quan trọng khi muốn kết luận mạnh)**: chạy 2–3 lần MD (seed khác), so RMSD/Rg/SASA/MMGBSA có đồng thuận không.
-   *Vì sao mạnh:* tránh kết luận dựa trên "1 trajectory may be lucky".
+With a clearly negative ΔTOTAL dominated by vdW, the textbook interpretation is: binding is driven by hydrophobic packing and shape complementarity; polar solvation partly opposes it, but the total remains favourable.
 
 ---
 
-## 4. "Bộ bằng chứng" tối thiểu để nói: đáng thử in vitro / in vivo
+## 3. Highly recommended additional analyses
 
-| Lớp | Bằng chứng |
-|-----|-----------|
-| 1. Ổn định cấu trúc | RMSD/Rg/SASA ổn định; DSSP không biến dạng lớn |
-| 2. Ổn định tương tác | ligand RMSD + contacts + mindist + H-bond occupancy |
-| 3. Năng lượng | MM/GBSA ΔG_bind âm ổn định + (tốt nhất) residue decomposition |
-| 4. Binding mode | clustering cho thấy 1–2 binding mode chiếm ưu thế |
-| 5. Độ tin cậy | chạy replicate hoặc so với ligand đối chứng / known inhibitor |
+Once the core analyses are done, these make the study stronger and closer to publication style:
 
-Đủ 5 lớp này thì phần "complex tiềm năng" rất tròn bài.
+1. **Contacts & minimum distance (interface stability)**: `ncontacts(t)` between protein and ligand (within a cut-off, e.g. 0.35–0.45 nm); `mindist(t)` protein–ligand.
+   *Why it is strong:* it directly shows that "the ligand stays in contact", not only via RMSD.
+2. **COM distance (does the ligand leave the pocket?)**: distance COM(ligand)–COM(pocket) or COM(protein).
+   *Why it is strong:* ligand RMSD can increase because of rotation / pose changes; COM distance shows clearly whether it leaves the pocket.
+3. **Clustering (dominant binding pose)**: cluster the stable part (e.g. 20–100 ns). Report the top 1–3 clusters + % occupancy + representative pose.
+   *Why it is strong:* papers like a "dominant binding mode".
+4. **Per-residue H-bond occupancy**: not just "how many H-bonds", but which H-bond lasts longest (%) and which residues are key.
+   *Why it is strong:* tells the mechanistic story and guides mutations / assays.
+5. **Per-residue energy decomposition (MM/GBSA decomp)**: table of the residues contributing most (top favourable residues).
+   *Why it is strong:* links energy ↔ pocket residues ↔ rational drug design.
+6. **PCA / essential dynamics (APO vs HOLO)**: compare the main motion subspaces; does HOLO reduce pocket fluctuations?
+   *Why it is strong:* shows how the ligand affects global dynamics.
+7. **Replicate MD (essential for strong conclusions)**: run 2–3 MD replicas (different seeds) and check that RMSD / Rg / SASA / MM/GBSA agree.
+   *Why it is strong:* avoids conclusions based on "one lucky trajectory".
 
 ---
 
-## 5. Lưu ý quan trọng cho người mới
+## 4. Minimum "evidence stack" to argue that a complex deserves in vitro / in vivo testing
 
-- MD + MM/GBSA **không chứng minh hiệu quả sinh học**, chỉ cung cấp bằng chứng cơ học/động lực học cho binding ổn định.
-- Kết luận nên viết kiểu: *"support / consistent with / likely"* hơn là *"confirm"*.
-- Khi muốn so sánh ligand, hãy giữ **cùng protocol** (thời gian, interval, cutoff, forcefield, xử lý PBC, đoạn ổn định).
+| Layer | Evidence |
+|-------|----------|
+| 1. Structural stability | stable RMSD / Rg / SASA; no major DSSP changes |
+| 2. Interaction stability | ligand RMSD + contacts + mindist + H-bond occupancy |
+| 3. Energetics | stable negative MM/GBSA ΔG_bind + (ideally) per-residue decomposition |
+| 4. Binding mode | clustering shows 1–2 dominant binding modes |
+| 5. Reliability | replicate runs, or comparison with a control ligand / known inhibitor |
+
+With all five layers, the case for a "promising complex" is well rounded.
+
+---
+
+## 5. Important notes for newcomers
+
+- MD + MM/GBSA **does not prove biological efficacy**; it only provides mechanistic / dynamic evidence of stable binding.
+- Phrase conclusions as *"supports / is consistent with / likely"* rather than *"confirms"*.
+- When comparing ligands, keep **the same protocol** (simulation length, output interval, cut-offs, force field, PBC handling, equilibrated window).

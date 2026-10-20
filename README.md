@@ -12,7 +12,7 @@
 ![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)
 ![gmx_MMPBSA](https://img.shields.io/badge/MM%2FGBSA-gmx__MMPBSA-8250DF?style=flat-square)
 ![Platform](https://img.shields.io/badge/Ubuntu%20%2F%20WSL-E95420?style=flat-square&logo=ubuntu&logoColor=white)
-![Docs](https://img.shields.io/badge/guides-Ti%E1%BA%BFng%20Vi%E1%BB%87t-DA251D?style=flat-square)
+![Docs](https://img.shields.io/badge/docs-English-2EA043?style=flat-square)
 
 **Reproducible, step-by-step GROMACS workflows for protein–protein complexes and protein–ligand (APO vs HOLO) systems —<br/>from a raw PDB file to equilibrated trajectories, comparative analysis, MM/GBSA, and publication-ready figures.**
 
@@ -38,9 +38,6 @@ This repository collects the protocols, GROMACS parameter (`.mdp`) files, and an
 | **Protein–Ligand** | Does a docked small molecule stay in its pocket, and does it change the protein's dynamics compared with the unbound (APO) state? | post-docking validation, ligand ranking with MM/GBSA |
 
 Each track ships with the exact `.mdp` files, an annotated command-by-command guide, a troubleshooting section, and a consistent naming scheme so that the output `.xvg` files feed straight into the plotting script.
-
-> [!NOTE]
-> The step-by-step guides inside each folder are written in **Vietnamese** (this README is in English). All commands, file names and parameters are language-independent.
 
 ---
 
@@ -296,7 +293,7 @@ Buried surface area is computed per frame as
 
 $$\mathrm{BSA}(t) = \mathrm{SASA}_{\text{protein}}(t) + \mathrm{SASA}_{\text{ligand}}(t) - \mathrm{SASA}_{\text{complex}}(t)$$
 
-with a built-in check that the three time columns line up (see [`protein-ligand/ANALYSIS.md`](protein-ligand/ANALYSIS.md#c35-buried-surface-area-theo-thời-gian)).
+with a built-in check that the three time columns line up (see [`protein-ligand/ANALYSIS.md`](protein-ligand/ANALYSIS.md#c35-buried-surface-area-over-time)).
 
 ---
 
@@ -397,6 +394,6 @@ Three screen-recorded tutorials accompany the protein–ligand guide: *adding hy
 
 ## 👤 Author
 
-**Phan Hoang Nam (潘黃南** · M.S. student, Smart Medicine and Health Informatics, National Taiwan University
+**Phan Hoang Nam** · M.S. student, Smart Medicine and Health Informatics, National Taiwan University
 
 If these protocols help your work, please cite the original methods above and link back to this repository.

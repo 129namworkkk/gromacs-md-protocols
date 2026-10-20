@@ -1,43 +1,43 @@
 # Troubleshooting
 
-| Triệu chứng | Nguyên nhân thường gặp | Cách xử lý |
-|-------------|------------------------|-----------|
-| `pdb2gmx`: *atom CG used in that entry is not found* | residue thiếu atom | **tự động:** `scripts/prepare_system.sh` · thủ công: [PDBFixer](#1-thiếu-atom--residue-pdb2gmx) |
-| EM bùng nổ / LINCS warning ở một vị trí, bond rất dài | **thiếu residue** (gap) — pdb2gmx nối thẳng hai đầu gap | **tự động:** `scripts/prepare_system.sh` (model gap hoặc tách chain bằng TER) |
-| `Residue 'XXX' not found in residue topology database` | residue không chuẩn (MSE, HOH, ligand, ion) còn trong file | `scripts/fix_structure.py` thay/loại; ligand tách riêng (`--ligand`) |
-| `grompp`: không tìm thấy nhóm `Water_and_ions` / `Protein_UNL` | index chưa có nhóm tương ứng với `tc-grps` | [Tạo lại nhóm](#2-lỗi-nhóm-tc-grps) |
-| `trjconv`: mismatch số atom | chọn Output *System* khi `.xtc` chỉ có Protein | chọn Output trùng với nội dung `.xtc` (`gmx check -f file.xtc`) |
-| RMSD có spike rất lớn, SASA không đổi | PBC artifact | chạy `-pbc nojump` rồi `-pbc mol -center -ur compact` (xem [ANALYSIS.md](../protein-ligand/ANALYSIS.md)) |
-| `gmx_MMPBSA`: *ChamberParm does not support all potential terms…* | topology GROMACS không chuyển được sang Amber | [Build topology Amber cho ligand](#3-gmx_mmpbsa-chamberparm-error) |
-| `gmx_MMPBSA`: lỗi `AMBERHOME` | AmberTools chưa được activate | `conda activate gmxMMPBSA` rồi chạy lại |
+| Symptom | Usual cause | Fix |
+|---------|-------------|-----|
+| `pdb2gmx`: *atom CG used in that entry is not found* | residue with missing atoms | **automatic:** `scripts/prepare_system.sh` · manual: [PDBFixer](#1-missing-atoms--residues-pdb2gmx) |
+| EM blows up / LINCS warnings at one spot, a very long bond | **missing residues** (gap) — pdb2gmx bonds the two ends of the gap directly | **automatic:** `scripts/prepare_system.sh` (models the gap or splits the chain with TER) |
+| `Residue 'XXX' not found in residue topology database` | a non-standard residue (MSE, HOH, ligand, ion) is still in the file | `scripts/fix_structure.py` replaces / removes it; split the ligand off (`--ligand`) |
+| `grompp`: group `Water_and_ions` / `Protein_UNL` not found | the index has no group matching `tc-grps` | [Recreate the groups](#2-tc-grps-group-errors) |
+| `trjconv`: atom-count mismatch | output group *System* chosen while the `.xtc` contains only Protein | choose an output group that matches the `.xtc` (`gmx check -f file.xtc`) |
+| Huge RMSD spikes while SASA does not change | PBC artefact | run `-pbc nojump`, then `-pbc mol -center -ur compact` (see [ANALYSIS.md](../protein-ligand/ANALYSIS.md)) |
+| `gmx_MMPBSA`: *ChamberParm does not support all potential terms…* | the GROMACS topology cannot be converted to Amber | [Build an Amber topology for the ligand](#3-gmx_mmpbsa-chamberparm-error) |
+| `gmx_MMPBSA`: `AMBERHOME` error | AmberTools not activated | `conda activate gmxMMPBSA` and run again |
 
 ---
 
-## 1. Thiếu atom / residue (pdb2gmx)
+## 1. Missing atoms / residues (pdb2gmx)
 
-### Cách tự động (khuyên dùng)
+### Automatic (recommended)
 
 ```bash
-# chỉ kiểm tra (không cần cài gì thêm)
+# check only (no extra dependencies)
 python scripts/fix_structure.py pro.pdb --check-only
 
-# sửa + pdb2gmx + box + nước + ion + index trong một lệnh
+# repair + pdb2gmx + box + water + ions + index in one command
 bash scripts/prepare_system.sh --system apo --pdb pro.pdb --workdir runs/apo
-#   file không có SEQRES (docking, AlphaFold, Chimera)? thêm --fasta target.fasta
+#   no SEQRES records (docking, AlphaFold, Chimera output)? add --fasta target.fasta
 ```
 
-`prepare_system.sh` luôn sửa cấu trúc trước `pdb2gmx`; nếu `pdb2gmx` vẫn báo thiếu atom, script sửa lại và chạy lại `pdb2gmx` (kể cả khi dùng `--no-fix`). Báo cáo chi tiết ở `fix_report.json` và `prepare.log`.
+`prepare_system.sh` always repairs the structure before `pdb2gmx`; if `pdb2gmx` still reports missing atoms, the script repairs the structure again and retries `pdb2gmx` (also with `--no-fix`). A detailed report is written to `fix_report.json` and `prepare.log`.
 
-| Tình huống | Kết quả |
-|------------|---------|
-| Gap trong chuỗi ≤ `--max-gap` (mặc định 15) và biết trình tự (SEQRES hoặc `--fasta`) | model residue thiếu |
-| Gap dài hơn, hoặc không có trình tự | tách chain bằng `TER` + cảnh báo (`--strict` để dừng thay vì tách) |
-| Đuôi N/C-terminal thiếu | bỏ qua (thường là vùng mất trật tự); `--add-terminal` để model |
-| Side chain cụt, thiếu OXT | dựng lại |
+| Situation | Result |
+|-----------|--------|
+| Internal gap ≤ `--max-gap` (default 15) and the sequence is known (SEQRES or `--fasta`) | missing residues modelled |
+| Longer gap, or no sequence available | chain split with `TER` + warning (`--strict` stops instead of splitting) |
+| Missing N-/C-terminal tail | skipped (usually disordered); `--add-terminal` models it |
+| Truncated side chains, missing OXT | rebuilt |
 
-> Loop dài (> 15 residue) model bằng PDBFixer chỉ là hình học đơn giản. Với vùng quan trọng, dùng MODELLER hoặc ghép từ mô hình AlphaFold rồi mới chạy `prepare_system.sh`.
+> PDBFixer builds long loops (> 15 residues) with simple geometry only. For an important region, build it with MODELLER or graft it from an AlphaFold model before running `prepare_system.sh`.
 
-### Cách thủ công
+### Manual
 
 ```text
 Fatal error:
@@ -51,13 +51,13 @@ and/or residue naming needs to be fixed.
 conda install -c conda-forge pdbfixer openmm -y
 pdbfixer pro.pdb --add-atoms=heavy --add-residues --output pro_fixed.pdb
 
-# chạy lại
+# run again
 gmx pdb2gmx -f pro_fixed.pdb -o processed.gro -p topol.top -ter -ff oplsaa -water spc
 ```
 
-## 2. Lỗi nhóm `tc-grps`
+## 2. tc-grps group errors
 
-Kiểm tra `solv_ions.gro` có ion hay không. Nếu `grompp` vẫn báo lỗi nhóm, tạo lại bằng `make_ndx`:
+Check whether `solv_ions.gro` contains ions. If `grompp` still reports a group error, recreate the groups with `make_ndx`:
 
 ```bash
 gmx make_ndx -f em.gro -o index.ndx
@@ -65,21 +65,21 @@ gmx make_ndx -f em.gro -o index.ndx
 
 ```text
 > 1 | 13                     # Protein | UNL   → Protein_UNL   (HOLO)
-> r SOL | r NA | r CL        # → đổi tên thành Water_and_ions
+> r SOL | r NA | r CL        # → rename to Water_and_ions
 > name XX Water_and_ions
 > q
 ```
 
 ## 3. gmx_MMPBSA: ChamberParm error
 
-Build topology Amber (GAFF2) cho ligand:
+Build an Amber (GAFF2) topology for the ligand:
 
 ```bash
 antechamber -i LIG.pdb -fi pdb -o LIG.mol2 -fo mol2 -c bcc -nc YOUR_CHARGE -at gaff2
 parmchk2 -i LIG.mol2 -f mol2 -o LIG.frcmod
 ```
 
-Tạo `tleap.in`:
+Create `tleap.in`:
 
 ```bash
 cat > tleap.in << 'EOF'
@@ -95,11 +95,11 @@ saveAmberParm LIG LIG.prmtop LIG.inpcrd
 quit
 EOF
 
-ls -l tleap.in LIG.mol2 LIG.frcmod     # kiểm tra file đã có
+ls -l tleap.in LIG.mol2 LIG.frcmod     # check that the files exist
 tleap -f tleap.in
 ```
 
-Thành công khi có đủ:
+It worked when all of these exist:
 
 ```bash
 ls -l LIG.lib LIG.prmtop LIG.inpcrd
