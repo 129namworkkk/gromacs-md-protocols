@@ -18,6 +18,7 @@
 
 [Workflows](#-workflows) ·
 [Quick start](#-quick-start) ·
+[Run options](#-run-options) ·
 [Parameters](#%EF%B8%8F-simulation-parameters) ·
 [Analysis](#-analysis-outputs) ·
 [Plotting](#-plotting) ·
@@ -70,11 +71,20 @@ gromacs-md-protocols/
 ├── scripts/
 │   └── plot_compare_metrics.py      # APO vs HOLO comparison figures (PNG + TIFF)
 │
+├── runpod/                          # OPTIONAL: run the long simulations on rented GPUs
+│   ├── README.md                    # step-by-step RunPod guide
+│   ├── setup_gromacs.sh             # one-time GROMACS + CUDA build on the network volume
+│   ├── run_md.sh                    # resumable EM → NVT → NPT → MD pipeline (pp | apo | holo)
+│   ├── benchmark.sh                 # ns/day, run time and cost estimate
+│   ├── extend_md.sh                 # continue a finished run, e.g. 100 → 500 ns
+│   ├── pack_results.sh              # water-free trajectory + equilibration curves → .tar.gz
+│   └── common.sh
+│
 └── docs/
     ├── INSTALL.md                   # Ubuntu/WSL, GROMACS 2023.3 CUDA build, conda envs
+    ├── EXTENDED_500NS.md            # OPTIONAL 500 ns production: files, extension, analysis tips
     ├── TROUBLESHOOTING.md           # common pdb2gmx / grompp / trjconv / MM-GBSA errors
-    ├── MD_results_interpretation.md # how to read RMSD, RMSF, SASA, H-bonds, ΔG_bind
-    └── Training_information_v1.docx
+    └── MD_results_interpretation.md # how to read RMSD, RMSF, SASA, H-bonds, ΔG_bind
 ```
 
 ---
@@ -145,7 +155,7 @@ flowchart TB
 
 ```bash
 # 1. clone
-git clone https://github.com/<your-username>/gromacs-md-protocols.git
+git clone https://github.com/129namworkkk/gromacs-md-protocols.git
 cd gromacs-md-protocols
 
 # 2. install GROMACS (CUDA build) and the conda environments → docs/INSTALL.md
@@ -170,6 +180,39 @@ gmx grompp -f MD.mdp  -c npt.gro -t npt.cpt -p topol.top -n index.ndx -o md_0_10
 
 ---
 
+## 🚦 Run options
+
+The protocol is the same in every case — **prepare → EM → NVT → NPT → production → analysis**. Only the production length and the machine change.
+
+| | Standard | Extended (optional) |
+|---|---|---|
+| **Production length** | **100 ns** — `md.mdp` / `MD.mdp` | **500 ns** — `md_500ns.mdp` / `MD_500ns.mdp` ([details](docs/EXTENDED_500NS.md)) |
+| **Where to run** | your workstation, following the guides command by command | a rented GPU on [RunPod](runpod/README.md) with the automated pipeline |
+
+The 500 ns files keep every physical setting of the 100 ns files and only change `nsteps` and the output interval (one frame per 100 ps → 5 000 frames), so all analysis commands stay the same. An existing 100 ns run can be extended to 500 ns without restarting.
+
+```mermaid
+flowchart LR
+    PREP[Prepare system<br/>locally] --> EQ[EM → NVT → NPT]
+    EQ --> P100[Production<br/>100 ns · default]
+    EQ --> P500[Production<br/>500 ns · optional]
+    P100 -. extend .-> P500
+    P100 & P500 --> AN[Analysis<br/>MM/GBSA · figures]
+```
+
+On RunPod (or any Linux GPU machine) the whole simulation is one resumable command:
+
+```bash
+bash runpod/run_md.sh --system holo --length 500 --workdir /workspace/runs/my_complex --quick-test   # 500-step smoke test
+bash runpod/benchmark.sh --workdir /workspace/runs/my_complex --price 0.69                          # ns/day + cost (after --grompp-only)
+bash runpod/run_md.sh --system holo --length 500 --workdir /workspace/runs/my_complex                # real run; re-run to resume
+bash runpod/pack_results.sh --workdir /workspace/runs/my_complex                                     # water-free results to download
+```
+
+`--system` is `pp`, `apo` or `holo`; finished stages are skipped and production resumes from the last checkpoint (written every 15 min), so interruptible (spot) pods are safe to use.
+
+---
+
 ## ⚙️ Simulation parameters
 
 Values below are read directly from the `.mdp` files in this repository.
@@ -183,17 +226,17 @@ Values below are read directly from the `.mdp` files in this repository.
 | Energy minimisation | steepest descent, F<sub>max</sub> < 1000 kJ mol⁻¹ nm⁻¹, ≤ 50 000 steps | steepest descent, F<sub>max</sub> < 1000 kJ mol⁻¹ nm⁻¹, ≤ 5 000 steps |
 | NVT | 100 ps, V-rescale, **310 K**, position restraints | 500 ps, V-rescale, **298 K**, position restraints (protein + ligand) |
 | NPT | 100 ps, Parrinello-Rahman, 1 bar | 500 ps, Berendsen, 1 bar |
-| Production | **100 ns** (`md.mdp`) or **500 ns** (`md_500ns.mdp`), Parrinello-Rahman | **100 ns** (`MD.mdp`) or **500 ns** (`MD_500ns.mdp`), Parrinello-Rahman |
+| Production | **100 ns** (`md.mdp`, default) · **500 ns** (`md_500ns.mdp`, optional), Parrinello-Rahman | **100 ns** (`MD.mdp`, default) · **500 ns** (`MD_500ns.mdp`, optional), Parrinello-Rahman |
 | Time step | 2 fs, LINCS on H-bonds | 2 fs, LINCS on H-bonds |
 | Electrostatics | PME, r<sub>c</sub> = 1.0 nm | PME, r<sub>c</sub> = 1.2 nm |
 | van der Waals | cut-off 1.0 nm, `DispCorr = EnerPres` | cut-off 1.2 nm, force-switch from 1.0 nm |
 | Thermostat groups | `Protein  Non-Protein` | APO: `Protein  Water_and_ions` · HOLO: `Protein_UNL  Water_and_ions` |
-| Trajectory output | every 10 ps | every 20 ps |
+| Trajectory output | every 10 ps (100 ns) · every 100 ps (500 ns) | every 20 ps (100 ns) · every 100 ps (500 ns) |
 
 <details>
 <summary><b>Throughput reference</b></summary>
 
-The protein–protein `md.mdp` notes roughly **2.5 days per 100 ns on 1 GPU + 4 threads** for a medium-sized complex. The CUDA build in [`docs/INSTALL.md`](docs/INSTALL.md) targets RTX 40-series GPUs (`GMX_CUDA_TARGET_SM=89`); change this value for other architectures.
+The protein–protein `md.mdp` notes roughly **2.5 days per 100 ns on 1 GPU + 4 threads** for a medium-sized complex — a 500 ns run takes about five times as long. Measure your own speed with [`runpod/benchmark.sh`](runpod/benchmark.sh) or the `Performance:` line at the end of `md.log`. The CUDA build in [`docs/INSTALL.md`](docs/INSTALL.md) targets RTX 40-series GPUs (`GMX_CUDA_TARGET_SM=89`); change this value for other architectures ([`runpod/setup_gromacs.sh`](runpod/setup_gromacs.sh) detects it automatically).
 </details>
 
 ---
@@ -285,6 +328,8 @@ MD does not prove that a compound works; it builds quantitative evidence that a 
 | [`protein-ligand/apo/README.md`](protein-ligand/apo/README.md) | protein-only control and APO checklist |
 | [`protein-ligand/ANALYSIS.md`](protein-ligand/ANALYSIS.md) | PBC correction, index groups, all APO/HOLO metrics |
 | [`protein-ligand/MMGBSA.md`](protein-ligand/MMGBSA.md) | gmx_MMPBSA preparation, serial and MPI runs, reading ΔTOTAL |
+| [`docs/EXTENDED_500NS.md`](docs/EXTENDED_500NS.md) | optional 500 ns production: parameter differences, extending a 100 ns run, time and disk estimates, analysis tips |
+| [`runpod/README.md`](runpod/README.md) | optional cloud GPU workflow: pod setup, GROMACS build, quick test, benchmark, resumable run, packing and downloading results, replicas |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | missing atoms (PDBFixer), thermostat group errors, atom mismatches, ChamberParm error |
 
 ### 🎬 Tutorial videos
@@ -307,6 +352,7 @@ Three screen-recorded tutorials accompany the protein–ligand guide: *adding hy
 | [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/) + AmberTools ≤ 23.3 | Python 3.11 | MM/GBSA |
 | [PDBFixer](https://github.com/openmm/pdbfixer) | — | rebuilding missing atoms |
 | Python | 3 with `numpy`, `matplotlib` | plotting |
+| [RunPod](https://www.runpod.io/) *(optional)* | GPU pod + network volume | long (500 ns) runs without a local GPU |
 
 ---
 

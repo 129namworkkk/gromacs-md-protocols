@@ -1,0 +1,39 @@
+# --- GROMACS outputs (large / regenerable) ---
+*.xtc
+*.trr
+*.edr
+*.cpt
+*.tpr
+*.log
+*.ndx
+*_prev.*
+\#*#
+step*.pdb
+mdout.mdp
+
+# --- MM/GBSA intermediates ---
+_GMXMMPBSA_*
+COMPACT_MMXSA_RESULTS.mmxsa
+gmx_MMPBSA.log
+
+# --- Media (host videos outside git: GitHub Releases / YouTube / Drive) ---
+*.mp4
+*.mov
+*.avi
+
+# --- Python / notebooks ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# --- Generated plots ---
+plots/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- RunPod pipeline artefacts ---
+*.tar.gz
+quicktest/
